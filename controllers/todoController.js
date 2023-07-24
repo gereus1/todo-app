@@ -6,6 +6,7 @@ const urlencodedParser = bodyParser.urlencoded({ extended: false })
 
 const todoSchema = new mongoose.Schema({
     item: String,
+    date: { type: Date, default: Date.now },
 });
 
 const Todo = mongoose.model('Todo', todoSchema);
@@ -15,7 +16,6 @@ module.exports = (app) => {
     app.get('/todo', (req, res) => {
         Todo.find({})
         .then((todos) => {
-            // Render the 'todo' view with the fetched todos
             res.render('todo', { todos: todos });
         })
         .catch((err) => {
@@ -24,17 +24,53 @@ module.exports = (app) => {
         });
     });
 
-    app.post('/todo', urlencodedParser, (req, res) => {
-        const newTodo = new Todo(req.body);
-        newTodo.save()
-            .then((savedTodo) => {
-                res.send("Item saved to database");
-            })
-            .catch((err) => {
-                console.error('Error saving item to database:', err);
-                res.status(500).send("Unable to save item to database");
-            });
+    app.get('/stats', (req, res) => {
+    Todo.aggregate([
+        {
+            $project: {
+                yearMonthDayHourMin: {
+                    $dateToParts: { "date": "$date" }
+                },
+            }
+        },
+        {
+            $group: {
+                _id: {
+                    year: "$yearMonthDayHourMin.year",
+                    month: "$yearMonthDayHourMin.month",
+                    day: "$yearMonthDayHourMin.day",
+                    hour: "$yearMonthDayHourMin.hour",
+                    minute: "$yearMonthDayHourMin.minute",
+                },
+                count: { $sum: 1 },
+            }
+        }
+    ])
+        .then((stats) => {
+        res.render('stats', { stats });
+        })
+        .catch((err) => {
+        console.error('Error fetching statistics:', err);
+        res.status(500).send('Error fetching statistics');
+        });
     });
+    
+      app.post('/todo', urlencodedParser, (req, res) => {
+        const newTodo = new Todo({
+          item: req.body.item,
+        });
+    
+        newTodo
+          .save()
+          .then(() => {
+            res.send('Item saved to database');
+          })
+          .catch((err) => {
+            console.error('Error saving item to database:', err);
+            res.status(500).send('Unable to save item to database');
+          });
+    });
+
 
     app.delete('/todo/:item', (req, res) => {
         Todo.deleteOne({ item: req.params.item })
@@ -45,7 +81,5 @@ module.exports = (app) => {
             console.error('Error deleting item from database:', err);
             res.status(500).send("Unable to delete item from database");
         });    
-        // data = data.filter((todo) => todo.item.replace( / /g, '-') !== req.params.item )
-        // res.json(data);
     });
 }
