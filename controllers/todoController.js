@@ -44,6 +44,30 @@ module.exports = (app) => {
                 },
                 count: { $sum: 1 },
             }
+        },
+        {
+            $project: {
+            _id: 0,
+            date: {
+              $dateFromString: {
+                dateString: {
+                  $concat: [
+                    { $toString: "$_id.year" },
+                    "-",
+                    { $toString: "$_id.month" },
+                    "-",
+                    { $toString: "$_id.day" },
+                    "T",
+                    { $toString: "$_id.hour" },
+                    ":",
+                    { $toString: "$_id.minute" }
+                  ]
+                },
+                format: "%Y-%m-%dT%H:%M"
+              }
+            },
+            count: 1
+          }
         }
     ])
         .then((stats) => {
